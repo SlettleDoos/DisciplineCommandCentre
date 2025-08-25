@@ -30,6 +30,7 @@ mongoose
 
 // ✅ Schema
 const UserSchema = new mongoose.Schema({
+  _id: { type: String, required: true }, // force singleton id
   streak: { current: Number, longest: Number },
   goals: {
     daily: [{ text: String, challenge: String }],
@@ -43,11 +44,13 @@ const UserSchema = new mongoose.Schema({
 const User = mongoose.model("User", UserSchema);
 
 // ✅ API routes
+// ✅ API routes
 app.get("/api/user", async (req, res) => {
   try {
-    let user = await User.findOne();
+    let user = await User.findOne({ _id: "singleton" });
     if (!user) {
       user = new User({
+        _id: "singleton",
         streak: { current: 0, longest: 0 },
         goals: { daily: [], short: [], long: [] },
         affirmations: [],
@@ -55,6 +58,19 @@ app.get("/api/user", async (req, res) => {
       });
       await user.save();
     }
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/user", async (req, res) => {
+  try {
+    let user = await User.findOneAndUpdate(
+      { _id: "singleton" },   // always target the same doc
+      req.body,
+      { new: true, upsert: true }
+    );
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });
