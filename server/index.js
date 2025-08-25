@@ -24,10 +24,7 @@ app.get("*", (req, res) => {
 
 // ✅ Connect to MongoDB
 mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
@@ -64,12 +61,13 @@ app.get("/api/user", async (req, res) => {
   }
 });
 
+// ✅ Always update the same user (create if not exists)
 app.post("/api/user", async (req, res) => {
   try {
-    let user = await User.findOne();
-    if (!user) user = new User(req.body);
-    else Object.assign(user, req.body);
-    await user.save();
+    let user = await User.findOneAndUpdate({}, req.body, {
+      new: true,
+      upsert: true, // create if none exists
+    });
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });
