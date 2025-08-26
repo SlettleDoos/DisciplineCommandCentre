@@ -22,7 +22,7 @@ mongoose
 
 // ✅ Schema
 const UserSchema = new mongoose.Schema({
-  _id: { type: String, required: true },
+  _id: { type: String, required: true }, // singleton id
   streak: { current: Number, longest: Number },
   goals: {
     daily: [{ text: String, challenge: String }],
@@ -35,8 +35,10 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", UserSchema);
 
-// ✅ API routes (must come BEFORE frontend)
-app.get("/api/user", async (req, res) => {
+// ✅ API routes (use /api/data instead of /api/user)
+
+// GET → fetch current data
+app.get("/api/data", async (req, res) => {
   try {
     let user = await User.findOne({ _id: "singleton" });
     if (!user) {
@@ -55,10 +57,11 @@ app.get("/api/user", async (req, res) => {
   }
 });
 
-app.post("/api/user", async (req, res) => {
+// PUT → update existing data
+app.put("/api/data", async (req, res) => {
   try {
     let user = await User.findOneAndUpdate(
-      { _id: "singleton" },
+      { _id: "singleton" }, // always update the singleton
       req.body,
       { new: true, upsert: true }
     );

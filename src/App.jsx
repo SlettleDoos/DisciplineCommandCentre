@@ -199,7 +199,7 @@ function Dashboard({
     return () => clearInterval(interval);
   }, [backgroundImages, timer]);
 
-  // Rotate affirmations every timer duration
+  // Rotate affirmations
   const [currentAffirmationIndex, setCurrentAffirmationIndex] = useState(0);
   useEffect(() => {
     if (affirmations.length === 0) return;
@@ -207,7 +207,7 @@ function Dashboard({
       setCurrentAffirmationIndex(
         (prev) => (prev + 1) % affirmations.length
       );
-    }, 60000); // default 1 min
+    }, 60000);
     return () => clearInterval(interval);
   }, [affirmations]);
 
@@ -316,15 +316,6 @@ function Dashboard({
 export default function App() {
   const [currentStreak, setCurrentStreak] = useState(5);
   const [longestStreak, setLongestStreak] = useState(121);
-
-  const incrementStreak = () => {
-    const newStreak = currentStreak + 1;
-    setCurrentStreak(newStreak);
-    if (newStreak > longestStreak) setLongestStreak(newStreak);
-  };
-
-  const resetStreak = () => setCurrentStreak(0);
-
   const [goals, setGoals] = useState({
     daily: [{ text: "Meditate" }, { text: "Workout" }],
     short: [
@@ -336,7 +327,6 @@ export default function App() {
       { text: "Master Sexual Energy", due: "2026-03-01" },
     ],
   });
-
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [backgroundImages, setBackgroundImages] = useState([]);
   const [affirmations, setAffirmations] = useState([
@@ -345,6 +335,45 @@ export default function App() {
     "Discipline is freedom!",
   ]);
   const [timer, setTimer] = useState(60000); // default 1 min
+
+  // Load from backend
+  useEffect(() => {
+    fetch("/api/data")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data) return;
+        if (data.streak) {
+          setCurrentStreak(data.streak.current || 0);
+          setLongestStreak(data.streak.longest || 0);
+        }
+        if (data.goals) setGoals(data.goals);
+        if (data.affirmations) setAffirmations(data.affirmations);
+        if (data.backgrounds) setBackgroundImages(data.backgrounds);
+      })
+      .catch((err) => console.error("Failed to load:", err));
+  }, []);
+
+  // Save helper
+  const saveData = (updates) => {
+    fetch("/api/data", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    }).catch((err) => console.error("Failed to save:", err));
+  };
+
+  const incrementStreak = () => {
+    const newStreak = currentStreak + 1;
+    const newLongest = Math.max(longestStreak, newStreak);
+    setCurrentStreak(newStreak);
+    setLongestStreak(newLongest);
+    saveData({ streak: { current: newStreak, longest: newLongest } });
+  };
+
+  const resetStreak = () => {
+    setCurrentStreak(0);
+    saveData({ streak: { current: 0, longest: longestStreak } });
+  };
 
   return (
     <Router>
@@ -416,9 +445,15 @@ export default function App() {
                   resetStreak={resetStreak}
                   goals={goals}
                   backgroundImages={backgroundImages}
-                  setBackgroundImages={setBackgroundImages}
+                  setBackgroundImages={(imgs) => {
+                    setBackgroundImages(imgs);
+                    saveData({ backgrounds: imgs });
+                  }}
                   affirmations={affirmations}
-                  setAffirmations={setAffirmations}
+                  setAffirmations={(a) => {
+                    setAffirmations(a);
+                    saveData({ affirmations: a });
+                  }}
                   timer={timer}
                   setTimer={setTimer}
                 />
@@ -426,7 +461,15 @@ export default function App() {
             />
             <Route
               path="/goals"
-              element={<Goals goals={goals} setGoals={setGoals} />}
+              element={
+                <Goals
+                  goals={goals}
+                  setGoals={(g) => {
+                    setGoals(g);
+                    saveData({ goals: g });
+                  }}
+                />
+              }
             />
             <Route path="/journal" element={<Journal />} />
             <Route path="/calendar" element={<Calendar goals={goals} />} />
