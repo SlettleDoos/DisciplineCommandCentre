@@ -11,7 +11,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express(); // <--- initialize app FIRST
+const app = express();
 
 app.use(cors());
 app.use(express.json());
@@ -44,7 +44,6 @@ const UserSchema = new mongoose.Schema({
 const User = mongoose.model("User", UserSchema);
 
 // ✅ API routes
-// ✅ API routes
 app.get("/api/user", async (req, res) => {
   try {
     let user = await User.findOne({ _id: "singleton" });
@@ -69,21 +68,8 @@ app.post("/api/user", async (req, res) => {
     let user = await User.findOneAndUpdate(
       { _id: "singleton" },   // always target the same doc
       req.body,
-      { new: true, upsert: true }
+      { new: true, upsert: true } // create if none exists
     );
-    res.json(user);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ✅ Always update the same user (create if not exists)
-app.post("/api/user", async (req, res) => {
-  try {
-    let user = await User.findOneAndUpdate({}, req.body, {
-      new: true,
-      upsert: true, // create if none exists
-    });
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });
