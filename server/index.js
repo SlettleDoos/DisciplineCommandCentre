@@ -7,20 +7,12 @@ import { fileURLToPath } from "url";
 
 dotenv.config();
 
-// Fix __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
-
-// ✅ Serve frontend (dist folder)
-app.use(express.static(path.join(__dirname, "../dist")));
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../dist/index.html"));
-});
 
 // ✅ Connect to MongoDB
 mongoose
@@ -30,7 +22,7 @@ mongoose
 
 // ✅ Schema
 const UserSchema = new mongoose.Schema({
-  _id: { type: String, required: true }, // force singleton id
+  _id: { type: String, required: true },
   streak: { current: Number, longest: Number },
   goals: {
     daily: [{ text: String, challenge: String }],
@@ -43,7 +35,7 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", UserSchema);
 
-// ✅ API routes
+// ✅ API routes (must come BEFORE frontend)
 app.get("/api/user", async (req, res) => {
   try {
     let user = await User.findOne({ _id: "singleton" });
@@ -66,9 +58,9 @@ app.get("/api/user", async (req, res) => {
 app.post("/api/user", async (req, res) => {
   try {
     let user = await User.findOneAndUpdate(
-      { _id: "singleton" },   // always target the same doc
+      { _id: "singleton" },
       req.body,
-      { new: true, upsert: true } // create if none exists
+      { new: true, upsert: true }
     );
     res.json(user);
   } catch (err) {
@@ -76,6 +68,11 @@ app.post("/api/user", async (req, res) => {
   }
 });
 
-// ✅ Start server
+// ✅ Serve frontend last (catch-all)
+app.use(express.static(path.join(__dirname, "../dist")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../dist/index.html"));
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
