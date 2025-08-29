@@ -1,26 +1,48 @@
 import { useState } from "react";
 
-export default function Goals({ goals, setGoals }) {
+export default function Goals({ goals, setGoals, user, setUser }) {
   const [inputs, setInputs] = useState({ daily: "", short: "", long: "" });
   const [editing, setEditing] = useState({ type: null, index: null });
 
+  // ✅ Save to backend
+  const saveToBackend = async (updatedGoals) => {
+    const updatedUser = { ...user, goals: updatedGoals };
+    setUser(updatedUser);
+    setGoals(updatedGoals);
+
+    try {
+      await fetch("/api/data", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedUser),
+      });
+    } catch (err) {
+      console.error("Failed to save goals:", err);
+    }
+  };
+
   const handleAddGoal = (type) => {
     if (!inputs[type]) return;
-    setGoals((prev) => ({
-      ...prev,
+
+    const updatedGoals = {
+      ...goals,
       [type]: [
-        ...prev[type],
+        ...goals[type],
         type === "daily" ? { text: inputs[type] } : { text: inputs[type], due: "" },
       ],
-    }));
+    };
+
+    saveToBackend(updatedGoals);
     setInputs((prev) => ({ ...prev, [type]: "" }));
   };
 
   const handleDeleteGoal = (type, index) => {
-    setGoals((prev) => ({
-      ...prev,
-      [type]: prev[type].filter((_, i) => i !== index),
-    }));
+    const updatedGoals = {
+      ...goals,
+      [type]: goals[type].filter((_, i) => i !== index),
+    };
+
+    saveToBackend(updatedGoals);
   };
 
   const handleEditGoal = (type, index) => {
@@ -30,25 +52,31 @@ export default function Goals({ goals, setGoals }) {
 
   const handleSaveEdit = (type) => {
     const index = editing.index;
-    setGoals((prev) => ({
-      ...prev,
-      [type]: prev[type].map((g, i) =>
+    const updatedGoals = {
+      ...goals,
+      [type]: goals[type].map((g, i) =>
         i === index
           ? type === "daily"
             ? { text: inputs[type] }
             : { ...g, text: inputs[type] }
           : g
       ),
-    }));
+    };
+
+    saveToBackend(updatedGoals);
     setEditing({ type: null, index: null });
     setInputs((prev) => ({ ...prev, [type]: "" }));
   };
 
   const handleDueChange = (type, index, due) => {
-    setGoals((prev) => ({
-      ...prev,
-      [type]: prev[type].map((g, i) => (i === index ? { ...g, due } : g)),
-    }));
+    const updatedGoals = {
+      ...goals,
+      [type]: goals[type].map((g, i) =>
+        i === index ? { ...g, due } : g
+      ),
+    };
+
+    saveToBackend(updatedGoals);
   };
 
   const renderSection = (type, title, showDue = false) => (

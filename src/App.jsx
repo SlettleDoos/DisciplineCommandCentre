@@ -6,14 +6,15 @@ import Stats from "./pages/Stats";
 import Calendar from "./pages/Calendar";
 import ProgressPics from "./pages/ProgressPics";
 
-// Modal for Affirmations
+/* ===========================
+   Affirmations Modal
+=========================== */
 function AffirmationsModal({ show, onClose, affirmations, setAffirmations }) {
   const [input, setInput] = useState("");
-
   if (!show) return null;
 
   const handleAdd = () => {
-    if (input.trim() === "") return;
+    if (!input.trim()) return;
     setAffirmations([...affirmations, input.trim()]);
     setInput("");
   };
@@ -23,22 +24,21 @@ function AffirmationsModal({ show, onClose, affirmations, setAffirmations }) {
   };
 
   const handleEdit = (index) => {
-    const newText = prompt("Edit affirmation", affirmations[index]);
-    if (newText !== null) {
-      setAffirmations(
-        affirmations.map((a, i) => (i === index ? newText : a))
-      );
+    const next = prompt("Edit affirmation", affirmations[index]);
+    if (next !== null) {
+      setAffirmations(affirmations.map((a, i) => (i === index ? next : a)));
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="bg-gray-900 text-white p-6 rounded-lg w-96 max-h-[80vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">Manage Affirmations</h2>
+
         <ul className="space-y-2 mb-4">
           {affirmations.map((a, i) => (
             <li key={i} className="flex justify-between items-center">
-              <span>{a}</span>
+              <span className="truncate">{a}</span>
               <div className="flex gap-2">
                 <button
                   className="text-blue-300 hover:underline text-sm"
@@ -56,6 +56,7 @@ function AffirmationsModal({ show, onClose, affirmations, setAffirmations }) {
             </li>
           ))}
         </ul>
+
         <div className="flex gap-2">
           <input
             type="text"
@@ -71,6 +72,7 @@ function AffirmationsModal({ show, onClose, affirmations, setAffirmations }) {
             Add
           </button>
         </div>
+
         <button
           className="mt-4 bg-gray-700 px-4 py-1 rounded hover:bg-gray-600"
           onClick={onClose}
@@ -82,38 +84,77 @@ function AffirmationsModal({ show, onClose, affirmations, setAffirmations }) {
   );
 }
 
-// Modal for Backgrounds
+/* ===========================
+   Backgrounds Modal
+   - Uploads to /api/upload
+   - Saves served URLs (strings) in /api/data.backgrounds
+=========================== */
 function BackgroundsModal({
   show,
   onClose,
-  backgrounds,
+  backgrounds, // string[]
   setBackgrounds,
   timer,
   setTimer,
 }) {
   const [newImage, setNewImage] = useState(null);
-  const [newTimer, setNewTimer] = useState(timer / 1000);
+  const [newTimer, setNewTimer] = useState(Math.max(1, Math.floor(timer / 1000)));
+
+  useEffect(() => {
+    setNewTimer(Math.max(1, Math.floor(timer / 1000)));
+  }, [timer]);
 
   if (!show) return null;
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newImage) return;
-    const url = URL.createObjectURL(newImage);
-    setBackgrounds([...backgrounds, url]);
-    setNewImage(null);
+
+    const formData = new FormData();
+    formData.append("file", newImage);
+
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const { fileId } = await res.json();
+      const servedUrl = `/api/images/${fileId}`;
+
+      const updated = [...backgrounds, servedUrl];
+      setBackgrounds(updated);
+
+      await fetch("/api/data", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backgrounds: updated }),
+      });
+    } catch (err) {
+      console.error("Upload failed:", err);
+      alert("Upload failed. Check server logs.");
+    } finally {
+      setNewImage(null);
+    }
   };
 
-  const handleDelete = (index) => {
-    setBackgrounds(backgrounds.filter((_, i) => i !== index));
+  const handleDelete = async (index) => {
+    const updated = backgrounds.filter((_, i) => i !== index);
+    setBackgrounds(updated);
+    try {
+      await fetch("/api/data", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backgrounds: updated }),
+      });
+    } catch (err) {
+      console.error("Failed to save backgrounds:", err);
+    }
   };
 
   const handleTimerChange = () => {
-    const ms = parseInt(newTimer, 10) * 1000;
-    if (!isNaN(ms) && ms > 0) setTimer(ms);
+    const sec = parseInt(newTimer, 10);
+    if (!Number.isNaN(sec) && sec > 0) setTimer(sec * 1000);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="bg-gray-900 text-white p-6 rounded-lg w-96 max-h-[80vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">Manage Backgrounds</h2>
 
@@ -135,7 +176,7 @@ function BackgroundsModal({
           <input
             type="file"
             accept="image/*"
-            onChange={(e) => setNewImage(e.target.files[0])}
+            onChange={(e) => setNewImage(e.target.files?.[0] || null)}
           />
           <button
             className="bg-blue-400 px-4 py-1 rounded hover:bg-blue-500"
@@ -149,6 +190,7 @@ function BackgroundsModal({
           <label>Slideshow Timer (sec):</label>
           <input
             type="number"
+            min="1"
             value={newTimer}
             onChange={(e) => setNewTimer(e.target.value)}
             className="w-20 p-1 rounded text-black"
@@ -172,14 +214,16 @@ function BackgroundsModal({
   );
 }
 
-// Dashboard (Command Center)
+/* ===========================
+   Dashboard
+=========================== */
 function Dashboard({
   currentStreak,
   longestStreak,
   incrementStreak,
   resetStreak,
   goals,
-  backgroundImages,
+  backgroundImages, // string[]
   setBackgroundImages,
   affirmations,
   setAffirmations,
@@ -189,39 +233,46 @@ function Dashboard({
   const [showAffirmationsModal, setShowAffirmationsModal] = useState(false);
   const [showBackgroundsModal, setShowBackgroundsModal] = useState(false);
   const [bgIndex, setBgIndex] = useState(0);
+  const [currentAffirmationIndex, setCurrentAffirmationIndex] = useState(0);
 
   // Rotate background images
   useEffect(() => {
-    if (backgroundImages.length === 0) return;
-    const interval = setInterval(() => {
+    if (!backgroundImages || backgroundImages.length === 0) return;
+    const id = setInterval(() => {
       setBgIndex((prev) => (prev + 1) % backgroundImages.length);
     }, timer);
-    return () => clearInterval(interval);
+    return () => clearInterval(id);
   }, [backgroundImages, timer]);
 
-  // Rotate affirmations
-  const [currentAffirmationIndex, setCurrentAffirmationIndex] = useState(0);
+  // Rotate affirmations every 60s
   useEffect(() => {
-    if (affirmations.length === 0) return;
-    const interval = setInterval(() => {
-      setCurrentAffirmationIndex(
-        (prev) => (prev + 1) % affirmations.length
-      );
+    if (!affirmations || affirmations.length === 0) return;
+    const id = setInterval(() => {
+      setCurrentAffirmationIndex((prev) => (prev + 1) % affirmations.length);
     }, 60000);
-    return () => clearInterval(interval);
+    return () => clearInterval(id);
   }, [affirmations]);
+
+  const bgUrl =
+    backgroundImages && backgroundImages.length > 0
+      ? backgroundImages[bgIndex]
+      : null;
 
   return (
     <div
       className="min-h-screen w-full flex flex-col items-center justify-center p-6"
       style={{
-        backgroundImage: `url(${backgroundImages[bgIndex]})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        transition: "background-image 1s ease-in-out",
+        ...(bgUrl
+          ? {
+              backgroundImage: `url(${bgUrl})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              transition: "background-image 0.6s ease-in-out",
+            }
+          : { backgroundColor: "#111827" }),
       }}
     >
-      <div className="bg-black bg-opacity-50 p-6 rounded-lg w-full max-w-4xl flex flex-col items-center gap-6">
+      <div className="bg-black/50 p-6 rounded-lg w-full max-w-4xl flex flex-col items-center gap-6">
         <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
           ⚡ Command Center ⚡
         </h1>
@@ -231,6 +282,7 @@ function Dashboard({
           <p className="text-3xl md:text-4xl font-bold text-white">
             🔥 Current Streak: {currentStreak} days
           </p>
+          <p className="text-white/80">Longest: {longestStreak} days</p>
           <div className="flex gap-2">
             <button
               onClick={incrementStreak}
@@ -274,9 +326,11 @@ function Dashboard({
           {["daily", "short", "long"].map((type) => (
             <div
               key={type}
-              className="bg-gray-900 bg-opacity-70 p-4 rounded-lg text-white"
+              className="bg-gray-900/70 p-4 rounded-lg text-white"
             >
-              <h2 className="text-lg font-semibold mb-2 capitalize">{type} Goals</h2>
+              <h2 className="text-lg font-semibold mb-2 capitalize">
+                {type} Goals
+              </h2>
               <ul className="space-y-2">
                 {goals[type].map((goal, i) => (
                   <li key={i}>
@@ -294,6 +348,7 @@ function Dashboard({
         </div>
       </div>
 
+      {/* Modals */}
       <AffirmationsModal
         show={showAffirmationsModal}
         onClose={() => setShowAffirmationsModal(false)}
@@ -313,6 +368,9 @@ function Dashboard({
   );
 }
 
+/* ===========================
+   App Root
+=========================== */
 export default function App() {
   const [currentStreak, setCurrentStreak] = useState(5);
   const [longestStreak, setLongestStreak] = useState(121);
@@ -328,13 +386,15 @@ export default function App() {
     ],
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [backgroundImages, setBackgroundImages] = useState([]);
+
+  // IMPORTANT: backgrounds are simple URL strings served by your backend
+  const [backgroundImages, setBackgroundImages] = useState([]); // string[]
   const [affirmations, setAffirmations] = useState([
     "Stay strong!",
     "Focus on your goals!",
     "Discipline is freedom!",
   ]);
-  const [timer, setTimer] = useState(60000); // default 1 min
+  const [timer, setTimer] = useState(60000); // ms
 
   // Load from backend
   useEffect(() => {
@@ -348,7 +408,14 @@ export default function App() {
         }
         if (data.goals) setGoals(data.goals);
         if (data.affirmations) setAffirmations(data.affirmations);
-        if (data.backgrounds) setBackgroundImages(data.backgrounds);
+
+        // Normalize backgrounds to string[]
+        if (Array.isArray(data.backgrounds)) {
+          const normalized = data.backgrounds.map((b) =>
+            typeof b === "string" ? b : b?.url
+          ).filter(Boolean);
+          setBackgroundImages(normalized);
+        }
       })
       .catch((err) => console.error("Failed to load:", err));
   }, []);
@@ -386,40 +453,22 @@ export default function App() {
         >
           <h1 className="text-2xl font-bold mb-6">Discipline App</h1>
           <nav className="space-y-3">
-            <Link
-              to="/"
-              className="block p-2 rounded hover:bg-gray-700 transition"
-            >
+            <Link to="/" className="block p-2 rounded hover:bg-gray-700 transition">
               Command Center
             </Link>
-            <Link
-              to="/journal"
-              className="block p-2 rounded hover:bg-gray-700 transition"
-            >
+            <Link to="/journal" className="block p-2 rounded hover:bg-gray-700 transition">
               Journal
             </Link>
-            <Link
-              to="/goals"
-              className="block p-2 rounded hover:bg-gray-700 transition"
-            >
+            <Link to="/goals" className="block p-2 rounded hover:bg-gray-700 transition">
               Goals
             </Link>
-            <Link
-              to="/calendar"
-              className="block p-2 rounded hover:bg-gray-700 transition"
-            >
+            <Link to="/calendar" className="block p-2 rounded hover:bg-gray-700 transition">
               Calendar
             </Link>
-            <Link
-              to="/stats"
-              className="block p-2 rounded hover:bg-gray-700 transition"
-            >
+            <Link to="/stats" className="block p-2 rounded hover:bg-gray-700 transition">
               Stats
             </Link>
-            <Link
-              to="/progress-pics"
-              className="block p-2 rounded hover:bg-gray-700 transition"
-            >
+            <Link to="/progress-pics" className="block p-2 rounded hover:bg-gray-700 transition">
               Progress Pics
             </Link>
           </nav>
@@ -444,10 +493,10 @@ export default function App() {
                   incrementStreak={incrementStreak}
                   resetStreak={resetStreak}
                   goals={goals}
-                  backgroundImages={backgroundImages}
+                  backgroundImages={backgroundImages} // string[]
                   setBackgroundImages={(imgs) => {
                     setBackgroundImages(imgs);
-                    saveData({ backgrounds: imgs });
+                    saveData({ backgrounds: imgs }); // persist urls
                   }}
                   affirmations={affirmations}
                   setAffirmations={(a) => {

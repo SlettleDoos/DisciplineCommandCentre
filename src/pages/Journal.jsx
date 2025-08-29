@@ -1,10 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  parseISO,
-  format,
-  getWeek,
-  getYear,
-} from "date-fns";
+import { parseISO, format, getWeek, getYear } from "date-fns";
 
 export default function Journal() {
   const [entry, setEntry] = useState("");
@@ -28,16 +23,25 @@ export default function Journal() {
 
   const tagOptions = ["E Boost", "T Boost", "Shake", "Workout", "Jelq"];
 
+  // Fetch journal from backend
   useEffect(() => {
-    const saved = localStorage.getItem("journal");
-    if (saved) setEntries(JSON.parse(saved));
+    fetch("/api/journal")
+      .then((res) => res.json())
+      .then((data) => setEntries(data))
+      .catch((err) => console.error("Error fetching journal:", err));
   }, []);
 
-  const saveEntries = (newEntries) => {
-    // Always sort newest → oldest
-    newEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+  const saveEntries = async (newEntries) => {
     setEntries(newEntries);
-    localStorage.setItem("journal", JSON.stringify(newEntries));
+    try {
+      await fetch("/api/journal", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newEntries),
+      });
+    } catch (err) {
+      console.error("Error saving journal:", err);
+    }
   };
 
   const addOrEditEntry = () => {
@@ -56,7 +60,10 @@ export default function Journal() {
       newEntries = [...entries, newEntry];
     }
 
+    // Sort newest → oldest
+    newEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
     saveEntries(newEntries);
+
     setEntry("");
     setDate("");
     setMood("good");
@@ -125,14 +132,6 @@ export default function Journal() {
 
   const grouped = groupEntries();
 
-  const moodSummary = (entries) => {
-    const counts = { great: 0, good: 0, meh: 0 };
-    entries.forEach((e) => counts[e.mood]++);
-    return Object.keys(counts).reduce((a, b) =>
-      counts[a] >= counts[b] ? a : b
-    );
-  };
-
   // Toggle helpers
   const toggleYear = (year) =>
     setCollapsedYears((prev) => ({ ...prev, [year]: !prev[year] }));
@@ -143,13 +142,12 @@ export default function Journal() {
   const toggleDay = (day) =>
     setCollapsedDays((prev) => ({ ...prev, [day]: !prev[day] }));
 
-  // Expandable text component
   const ExpandableText = ({ text }) => {
     const [expanded, setExpanded] = useState(false);
     if (text.length <= 200) return <p>{text}</p>;
     return (
       <div>
-        <p>{expanded ? text : text.slice(0, 200) + "..."}</p>
+        <p>{expanded ? text : text.slice(0, 200) + "..."} </p>
         <button
           className="text-blue-500 text-sm mt-1"
           onClick={() => setExpanded(!expanded)}
@@ -305,17 +303,13 @@ export default function Journal() {
                                     </div>
                                     <div className="flex gap-2">
                                       <button
-                                        onClick={() =>
-                                          startEdit(entries.indexOf(e))
-                                        }
+                                        onClick={() => startEdit(entries.indexOf(e))}
                                         className="text-blue-500 hover:text-blue-700 font-semibold"
                                       >
                                         ✎
                                       </button>
                                       <button
-                                        onClick={() =>
-                                          deleteEntry(entries.indexOf(e))
-                                        }
+                                        onClick={() => deleteEntry(entries.indexOf(e))}
                                         className="text-red-500 hover:text-red-700 font-semibold"
                                       >
                                         ✕

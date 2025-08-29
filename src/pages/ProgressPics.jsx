@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Trash2, Save, ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import axios from "axios";
 
 export default function ProgressPics() {
   const [musclePics, setMusclePics] = useState([]);
@@ -16,44 +17,102 @@ export default function ProgressPics() {
   const [selectedPic, setSelectedPic] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
 
-  const handleUpload = (event, type) => {
+  // ------------------ FETCH DATA ------------------
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await axios.get("/api/data");
+        setMusclePics(
+          res.data.musclePics.map((p) => ({ ...p, url: `/api/images/${p.fileId}`, type: "muscle" }))
+        );
+        setCockPics(
+          res.data.cockPics.map((p) => ({ ...p, url: `/api/images/${p.fileId}`, type: "cock" }))
+        );
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // ------------------ UPLOAD ------------------
+  const handleUpload = async (event, type) => {
     const files = Array.from(event.target.files);
-    const newPics = files.map((file) => ({
-      url: URL.createObjectURL(file),
-      caption: "",
-      date: new Date().toISOString().split("T")[0],
-      type,
-    }));
+    const uploadedPics = [];
+
+    for (let file of files) {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const res = await axios.post("/api/upload", formData);
+        const picData = {
+          fileId: res.data.fileId,
+          caption: "",
+          date: new Date().toISOString().split("T")[0],
+          url: `/api/images/${res.data.fileId}`,
+          type,
+        };
+        uploadedPics.push(picData);
+      } catch (err) {
+        console.error(err);
+      }
+    }
 
     if (type === "muscle") {
-      setMusclePics((prev) => [...prev, ...newPics]);
+      const newPics = [...musclePics, ...uploadedPics];
+      setMusclePics(newPics);
+      await saveData({ musclePics: newPics });
     } else {
-      setCockPics((prev) => [...prev, ...newPics]);
+      const newPics = [...cockPics, ...uploadedPics];
+      setCockPics(newPics);
+      await saveData({ cockPics: newPics });
     }
   };
 
-  const handleDelete = (pic) => {
+  // ------------------ SAVE DATA ------------------
+  const saveData = async (updatedFields) => {
+    try {
+      const currentData = await axios.get("/api/data");
+      const newData = { ...currentData.data, ...updatedFields };
+      await axios.put("/api/data", newData);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // ------------------ DELETE ------------------
+  const handleDelete = async (pic) => {
     if (pic.type === "muscle") {
-      setMusclePics((prev) => prev.filter((p) => p.url !== pic.url));
+      const newPics = musclePics.filter((p) => p.fileId !== pic.fileId);
+      setMusclePics(newPics);
+      await saveData({ musclePics: newPics });
     } else {
-      setCockPics((prev) => prev.filter((p) => p.url !== pic.url));
+      const newPics = cockPics.filter((p) => p.fileId !== pic.fileId);
+      setCockPics(newPics);
+      await saveData({ cockPics: newPics });
     }
     setSelectedPic(null);
   };
 
-  const handleUpdate = (updatedPic) => {
-    const update = (arr) =>
-      arr.map((p) => (p.url === updatedPic.url ? updatedPic : p));
+  // ------------------ UPDATE ------------------
+  const handleUpdate = async (updatedPic) => {
+    const updateArr = (arr) =>
+      arr.map((p) => (p.fileId === updatedPic.fileId ? updatedPic : p));
 
     if (updatedPic.type === "muscle") {
-      setMusclePics((prev) => update(prev));
+      const newPics = updateArr(musclePics);
+      setMusclePics(newPics);
+      await saveData({ musclePics: newPics });
     } else {
-      setCockPics((prev) => update(prev));
+      const newPics = updateArr(cockPics);
+      setCockPics(newPics);
+      await saveData({ cockPics: newPics });
     }
     setSelectedPic(null);
   };
 
-  // Group by year > month > day
+  // ------------------ GROUPING ------------------
   const groupPics = (pics) => {
     const groups = {};
     pics.forEach((pic) => {
@@ -75,9 +134,8 @@ export default function ProgressPics() {
 
   const renderGrouped = (pics) => {
     const groups = groupPics(pics);
-
     return Object.entries(groups)
-      .sort(([a], [b]) => b.localeCompare(a)) // newest year first
+      .sort(([a], [b]) => b.localeCompare(a))
       .map(([year, months]) => (
         <div key={year} className="mb-4">
           <button
