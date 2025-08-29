@@ -4,9 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import multer from "multer";
-import { GridFsStorage } from "multer-gridfs-storage";
-import Grid from "gridfs-stream";
+import multer from "multer"; // ✅ NEW
 
 dotenv.config();
 
@@ -15,36 +13,21 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" })); // ✅ allow big JSON
 
-// ------------------- MONGODB CONNECTION -------------------
+// ✅ Multer setup (store in memory)
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+// ✅ Connect to MongoDB
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-let gfs;
-const conn = mongoose.connection;
-conn.once("open", () => {
-  gfs = Grid(conn.db, mongoose.mongo);
-  gfs.collection("uploads");
-});
-
-// ------------------- GRIDFS STORAGE -------------------
-const storage = new GridFsStorage({
-  url: process.env.MONGO_URI,
-  file: (req, file) => {
-    return {
-      filename: `${Date.now()}-${file.originalname}`,
-      bucketName: "uploads",
-    };
-  },
-});
-const upload = multer({ storage });
-
-// ------------------- USER SCHEMA -------------------
+// ✅ Schema
 const UserSchema = new mongoose.Schema({
-  _id: { type: String, required: true },
+  _id: { type: String, required: true }, // singleton id
   streak: { current: Number, longest: Number },
   goals: {
     daily: [{ text: String, challenge: String }],
@@ -52,34 +35,13 @@ const UserSchema = new mongoose.Schema({
     long: [{ text: String, due: String }],
   },
   affirmations: [String],
-  backgrounds: [
-    {
-      fileId: String, // MongoDB GridFS file ID
-      caption: String,
-      date: String,
-    },
-  ],
-  musclePics: [
-    {
-      fileId: String,
-      caption: String,
-      date: String,
-    },
-  ],
-  cockPics: [
-    {
-      fileId: String,
-      caption: String,
-      date: String,
-    },
-  ],
+  backgrounds: [String], // will store base64 images here
+  progressPics: [String], // ✅ optional if you want progress pics too
 });
 
 const User = mongoose.model("User", UserSchema);
 
-// ------------------- API ROUTES -------------------
-
-// GET user data
+// ✅ GET → fetch current data
 app.get("/api/data", async (req, res) => {
   try {
     let user = await User.findOne({ _id: "singleton" });
@@ -90,8 +52,7 @@ app.get("/api/data", async (req, res) => {
         goals: { daily: [], short: [], long: [] },
         affirmations: [],
         backgrounds: [],
-        musclePics: [],
-        cockPics: [],
+        progressPics: [],
       });
       await user.save();
     }
@@ -101,10 +62,10 @@ app.get("/api/data", async (req, res) => {
   }
 });
 
-// PUT → update user data
+// ✅ PUT → update existing data
 app.put("/api/data", async (req, res) => {
   try {
-    const user = await User.findOneAndUpdate(
+    let user = await User.findOneAndUpdate(
       { _id: "singleton" },
       req.body,
       { new: true, upsert: true }
@@ -115,28 +76,32 @@ app.put("/api/data", async (req, res) => {
   }
 });
 
-// ------------------- IMAGE UPLOAD -------------------
-// Upload a file to GridFS
-app.post("/api/upload", upload.single("file"), (req, res) => {
-  res.json({ fileId: req.file.id, filename: req.file.filename });
-});
-
-// Get an image by file ID
-app.get("/api/images/:id", async (req, res) => {
+// ✅ POST → upload image (background or progress pic)
+app.post("/api/upload", upload.single("image"), async (req, res) => {
   try {
-    const _id = new mongoose.Types.ObjectId(req.params.id);
-    const file = await gfs.files.findOne({ _id });
-    if (!file) return res.status(404).json({ error: "File not found" });
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
 
-    const readstream = gfs.createReadStream({ _id });
-    res.set("Content-Type", file.contentType || "image/jpeg");
-    readstream.pipe(res);
+    // Convert to base64
+    const base64Image = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+
+    // Save into user document
+    let user = await User.findOne({ _id: "singleton" });
+    if (!user) {
+      user = new User({ _id: "singleton" });
+    }
+
+    // Push into backgrounds (you can change to progressPics if needed)
+    user.backgrounds.push(base64Image);
+    await user.save();
+
+    res.json({ success: true, image: base64Image, user });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ------------------- SERVE FRONTEND -------------------
+// ✅ Serve frontend last
 app.use(express.static(path.join(__dirname, "../dist")));
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../dist/index.html"));
