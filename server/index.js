@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
-import fs from "fs";
+import { CloudinaryStorage } from "multer-storage-cloudinary"; // ✅ missing import
 
 dotenv.config();
 
@@ -84,7 +84,7 @@ app.get("/api/data", async (req, res) => {
 app.put("/api/data", async (req, res) => {
   try {
     let user = await User.findOneAndUpdate(
-      { _id: "singleton" }, 
+      { _id: "singleton" },
       req.body,
       { new: true, upsert: true }
     );
@@ -95,9 +95,9 @@ app.put("/api/data", async (req, res) => {
 });
 
 // ✅ Serve frontend last (catch-all)
-app.use(express.static(path.join(__dirname, "../dist")));
+app.use(express.static(path.join(__dirname, "dist")));
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../dist/index.html"));
+  res.sendFile(path.join(__dirname, "dist/index.html"));
 });
 
 const PORT = process.env.PORT || 5000;

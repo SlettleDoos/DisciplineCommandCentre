@@ -5,10 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && cd server && npm install",
-     "build:full": "npm install --prefix server && npm run build && rm -rf server/dist && cp -r dist server/",
+    "build": "vite build && npm install --prefix server && rm -rf server/dist && cp -r dist server/",
     "preview": "vite preview",
-    "postinstall": "npm install --prefix server && npm run build --prefix . && cp -r dist server/",
     "start": "node server/index.js"
   },
   "dependencies": {
