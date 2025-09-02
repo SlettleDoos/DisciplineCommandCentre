@@ -4,7 +4,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import multer from "multer"; // ✅ NEW
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+import fs from "fs";
 
 dotenv.config();
 
@@ -13,11 +15,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: "10mb" })); // ✅ allow big JSON
-
-// ✅ Multer setup (store in memory)
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
+app.use(express.json());
 
 // ✅ Connect to MongoDB
 mongoose
@@ -35,13 +33,39 @@ const UserSchema = new mongoose.Schema({
     long: [{ text: String, due: String }],
   },
   affirmations: [String],
-  backgrounds: [String], // will store base64 images here
-  progressPics: [String], // ✅ optional if you want progress pics too
+  backgrounds: [String],
 });
 
 const User = mongoose.model("User", UserSchema);
 
-// ✅ GET → fetch current data
+// ✅ Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// ✅ Multer setup (store files temporarily before upload)
+const upload = multer({ dest: "uploads/" });
+
+// ✅ Upload endpoint → Cloudinary
+app.post("/api/upload", upload.single("file"), async (req, res) => {
+  try {
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: "discipline-app", // optional: keeps images organized
+    });
+
+    // cleanup local temp file
+    fs.unlinkSync(req.file.path);
+
+    res.json({ url: result.secure_url }); // send Cloudinary URL back
+  } catch (err) {
+    console.error("❌ Upload error:", err);
+    res.status(500).json({ error: "Upload failed", details: err.message });
+  }
+});
+
+// ✅ API routes
 app.get("/api/data", async (req, res) => {
   try {
     let user = await User.findOne({ _id: "singleton" });
@@ -52,7 +76,6 @@ app.get("/api/data", async (req, res) => {
         goals: { daily: [], short: [], long: [] },
         affirmations: [],
         backgrounds: [],
-        progressPics: [],
       });
       await user.save();
     }
@@ -62,11 +85,10 @@ app.get("/api/data", async (req, res) => {
   }
 });
 
-// ✅ PUT → update existing data
 app.put("/api/data", async (req, res) => {
   try {
     let user = await User.findOneAndUpdate(
-      { _id: "singleton" },
+      { _id: "singleton" }, 
       req.body,
       { new: true, upsert: true }
     );
@@ -76,32 +98,7 @@ app.put("/api/data", async (req, res) => {
   }
 });
 
-// ✅ POST → upload image (background or progress pic)
-app.post("/api/upload", upload.single("image"), async (req, res) => {
-  try {
-    const file = req.file;
-    if (!file) return res.status(400).json({ error: "No file uploaded" });
-
-    // Convert to base64
-    const base64Image = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
-
-    // Save into user document
-    let user = await User.findOne({ _id: "singleton" });
-    if (!user) {
-      user = new User({ _id: "singleton" });
-    }
-
-    // Push into backgrounds (you can change to progressPics if needed)
-    user.backgrounds.push(base64Image);
-    await user.save();
-
-    res.json({ success: true, image: base64Image, user });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ✅ Serve frontend last
+// ✅ Serve frontend last (catch-all)
 app.use(express.static(path.join(__dirname, "../dist")));
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../dist/index.html"));
@@ -109,3 +106,4 @@ app.get("*", (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
