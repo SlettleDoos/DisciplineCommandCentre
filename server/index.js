@@ -45,24 +45,20 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ✅ Multer setup (store files temporarily before upload)
-const upload = multer({ dest: "uploads/" });
+// Multer + Cloudinary
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "discipline-app",
+    allowed_formats: ["jpg", "png", "jpeg", "webp"],
+  },
+});
+const upload = multer({ storage });
 
-// ✅ Upload endpoint → Cloudinary
-app.post("/api/upload", upload.single("file"), async (req, res) => {
-  try {
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: "discipline-app", // optional: keeps images organized
-    });
-
-    // cleanup local temp file
-    fs.unlinkSync(req.file.path);
-
-    res.json({ url: result.secure_url }); // send Cloudinary URL back
-  } catch (err) {
-    console.error("❌ Upload error:", err);
-    res.status(500).json({ error: "Upload failed", details: err.message });
-  }
+// Upload route
+app.post("/api/upload", upload.single("file"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  res.json({ url: req.file.path });
 });
 
 // ✅ API routes
