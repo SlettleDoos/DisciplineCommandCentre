@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "npx vite build && npm install --prefix server && rm -rf server/dist && cp -r dist server/",
-    "preview": "vite preview",
-    "start": "node server/index.js"
-  },
+  "dev": "vite",
+  "build": "npx vite build && npm install --prefix server && rm -rf server/dist && cp -r dist server/",
+  "preview": "vite preview",
+  "start": "node server/index.js"
+},
+
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-slot": "^1.2.3",
