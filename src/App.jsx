@@ -218,6 +218,8 @@ function BackgroundsModal({
     </div>
   );
 }
+export default App;
+
 
 /* ===========================
    Dashboard + App Root
