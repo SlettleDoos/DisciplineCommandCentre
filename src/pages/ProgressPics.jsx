@@ -309,5 +309,5 @@ export default function ProgressPics() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  );s
 }
