@@ -218,6 +218,30 @@ function BackgroundsModal({
     </div>
   );
 }
+
+function App() {
+  return (
+    <Router>
+      <nav className="p-4 bg-gray-800 text-white flex gap-4">
+        <Link to="/">Journal</Link>
+        <Link to="/goals">Goals</Link>
+        <Link to="/stats">Stats</Link>
+        <Link to="/calendar">Calendar</Link>
+        <Link to="/progress-pics">Progress Pics</Link>
+      </nav>
+
+      <Routes>
+        <Route path="/" element={<Journal />} />
+        <Route path="/goals" element={<Goals />} />
+        <Route path="/stats" element={<Stats />} />
+        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/progress-pics" element={<ProgressPics />} />
+      </Routes>
+    </Router>
+  );
+}
+
+
 export default App;
 
 
