@@ -85,32 +85,17 @@ function AffirmationsModal({ show, onClose, affirmations, setAffirmations }) {
 }
 
 /* ===========================
-   Backgrounds Modal (Cloudinary)
+   Backgrounds Modal
 =========================== */
-function BackgroundsModal({
-  show,
-  onClose,
-  backgrounds, // string[]
-  setBackgrounds,
-  timer,
-  setTimer,
-}) {
+function BackgroundsModal({ show, onClose, backgrounds, setBackgrounds }) {
   const [newImage, setNewImage] = useState(null);
-  const [newTimer, setNewTimer] = useState(Math.max(1, Math.floor(timer / 1000)));
-
-  useEffect(() => {
-    setNewTimer(Math.max(1, Math.floor(timer / 1000)));
-  }, [timer]);
 
   if (!show) return null;
 
   const handleAdd = async () => {
     if (!newImage) return;
-
     const formData = new FormData();
     formData.append("file", newImage);
-
-    // IMPORTANT: use your own values here 👇
     formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
 
     try {
@@ -118,12 +103,8 @@ function BackgroundsModal({
         `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
         { method: "POST", body: formData }
       );
-      if (!res.ok) throw new Error("Upload failed");
       const data = await res.json();
-
-      const servedUrl = data.secure_url;
-
-      const updated = [...backgrounds, servedUrl];
+      const updated = [...backgrounds, data.secure_url];
       setBackgrounds(updated);
 
       await fetch("/api/data", {
@@ -133,40 +114,28 @@ function BackgroundsModal({
       });
     } catch (err) {
       console.error("Upload failed:", err);
-      alert("Upload failed. Check your Cloudinary setup.");
-    } finally {
-      setNewImage(null);
     }
+    setNewImage(null);
   };
 
   const handleDelete = async (index) => {
     const updated = backgrounds.filter((_, i) => i !== index);
     setBackgrounds(updated);
-    try {
-      await fetch("/api/data", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ backgrounds: updated }),
-      });
-    } catch (err) {
-      console.error("Failed to save backgrounds:", err);
-    }
-  };
-
-  const handleTimerChange = () => {
-    const sec = parseInt(newTimer, 10);
-    if (!Number.isNaN(sec) && sec > 0) setTimer(sec * 1000);
+    await fetch("/api/data", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ backgrounds: updated }),
+    });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-gray-900 text-white p-6 rounded-lg w-96 max-h-[80vh] overflow-y-auto">
+      <div className="bg-gray-900 text-white p-6 rounded-lg w-96">
         <h2 className="text-xl font-bold mb-4">Manage Backgrounds</h2>
-
         <ul className="space-y-2 mb-4">
           {backgrounds.map((bg, i) => (
-            <li key={i} className="flex justify-between items-center">
-              <span className="truncate w-64">Background {i + 1}</span>
+            <li key={i} className="flex justify-between">
+              <span>Background {i + 1}</span>
               <button
                 className="text-red-400 hover:underline text-sm"
                 onClick={() => handleDelete(i)}
@@ -176,38 +145,17 @@ function BackgroundsModal({
             </li>
           ))}
         </ul>
-
-        <div className="flex flex-col gap-2 mb-4">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setNewImage(e.target.files?.[0] || null)}
-          />
-          <button
-            className="bg-blue-400 px-4 py-1 rounded hover:bg-blue-500"
-            onClick={handleAdd}
-          >
-            Add Background
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 mb-4">
-          <label>Slideshow Timer (sec):</label>
-          <input
-            type="number"
-            min="1"
-            value={newTimer}
-            onChange={(e) => setNewTimer(e.target.value)}
-            className="w-20 p-1 rounded text-black"
-          />
-          <button
-            className="bg-green-400 px-3 py-1 rounded hover:bg-green-500"
-            onClick={handleTimerChange}
-          >
-            Set
-          </button>
-        </div>
-
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => setNewImage(e.target.files?.[0] || null)}
+        />
+        <button
+          className="bg-blue-400 px-4 py-1 rounded hover:bg-blue-500 mt-2"
+          onClick={handleAdd}
+        >
+          Add Background
+        </button>
         <button
           className="mt-4 bg-gray-700 px-4 py-1 rounded hover:bg-gray-600"
           onClick={onClose}
@@ -219,34 +167,84 @@ function BackgroundsModal({
   );
 }
 
+/* ===========================
+   Command Centre Dashboard
+=========================== */
+function CommandCentre({ setShowAffirmations, setShowBackgrounds }) {
+  return (
+    <div className="p-6 text-white">
+      <h1 className="text-3xl font-bold mb-6">Discipline Command Centre</h1>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Link to="/journal" className="p-4 bg-gray-700 rounded">Journal</Link>
+        <Link to="/goals" className="p-4 bg-gray-700 rounded">Goals</Link>
+        <Link to="/stats" className="p-4 bg-gray-700 rounded">Stats</Link>
+        <Link to="/calendar" className="p-4 bg-gray-700 rounded">Calendar</Link>
+        <Link to="/progress-pics" className="p-4 bg-gray-700 rounded">Progress Pics</Link>
+        <button onClick={() => setShowAffirmations(true)} className="p-4 bg-gray-700 rounded">
+          Affirmations
+        </button>
+        <button onClick={() => setShowBackgrounds(true)} className="p-4 bg-gray-700 rounded">
+          Backgrounds
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ===========================
+   App Root
+=========================== */
 function App() {
+  const [showAffirmations, setShowAffirmations] = useState(false);
+  const [showBackgrounds, setShowBackgrounds] = useState(false);
+  const [affirmations, setAffirmations] = useState([]);
+  const [backgrounds, setBackgrounds] = useState([]);
+
+  // Load data on mount
+  useEffect(() => {
+    (async () => {
+      const res = await fetch("/api/data");
+      const data = await res.json();
+      setAffirmations(data.affirmations || []);
+      setBackgrounds(data.backgrounds || []);
+    })();
+  }, []);
+
   return (
     <Router>
-      <nav className="p-4 bg-gray-800 text-white flex gap-4">
-        <Link to="/">Journal</Link>
-        <Link to="/goals">Goals</Link>
-        <Link to="/stats">Stats</Link>
-        <Link to="/calendar">Calendar</Link>
-        <Link to="/progress-pics">Progress Pics</Link>
-      </nav>
-
       <Routes>
-        <Route path="/" element={<Journal />} />
+        <Route
+          path="/"
+          element={
+            <CommandCentre
+              setShowAffirmations={setShowAffirmations}
+              setShowBackgrounds={setShowBackgrounds}
+            />
+          }
+        />
+        <Route path="/journal" element={<Journal />} />
         <Route path="/goals" element={<Goals />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/progress-pics" element={<ProgressPics />} />
       </Routes>
+
+      {/* Modals */}
+      <AffirmationsModal
+        show={showAffirmations}
+        onClose={() => setShowAffirmations(false)}
+        affirmations={affirmations}
+        setAffirmations={setAffirmations}
+      />
+      <BackgroundsModal
+        show={showBackgrounds}
+        onClose={() => setShowBackgrounds(false)}
+        backgrounds={backgrounds}
+        setBackgrounds={setBackgrounds}
+      />
     </Router>
   );
 }
 
-
 export default App;
-
-
-/* ===========================
-   Dashboard + App Root
-=========================== */
-// ⬆ keep everything else the same from your original App.jsx (Dashboard + export default App)
-
