@@ -7,74 +7,152 @@ import Calendar from "./pages/Calendar";
 import ProgressPics from "./pages/ProgressPics";
 
 /* ===========================
+   Navbar
+=========================== */
+function Navbar() {
+  return (
+    <nav className="fixed top-0 left-0 w-full bg-black/70 backdrop-blur-md text-white px-6 py-3 flex justify-center gap-8 z-40">
+      <Link to="/">Home</Link>
+      <Link to="/journal">Journal</Link>
+      <Link to="/goals">Goals</Link>
+      <Link to="/stats">Stats</Link>
+      <Link to="/calendar">Calendar</Link>
+      <Link to="/progress-pics">Progress Pics</Link>
+    </nav>
+  );
+}
+
+/* ===========================
+   Command Centre Home
+=========================== */
+function CommandCentre({
+  affirmations,
+  goals,
+  setShowAffirmations,
+  setShowBackgrounds,
+}) {
+  return (
+    <div className="pt-24 px-6 text-white relative z-10 flex flex-col items-center min-h-screen">
+      {/* Big Title */}
+      <h1 className="text-5xl md:text-6xl font-extrabold mb-10 drop-shadow-lg text-center">
+        Discipline Command Centre
+      </h1>
+
+      {/* Goals - Big in Centre */}
+      <div className="bg-black/70 p-8 rounded-2xl shadow-xl w-full max-w-3xl mb-10">
+        <h2 className="text-3xl font-bold mb-4 text-center">Goals</h2>
+        {goals.length > 0 ? (
+          <ul className="space-y-3">
+            {goals.map((g, i) => (
+              <li
+                key={i}
+                className="bg-white/10 p-4 rounded-lg text-lg text-center"
+              >
+                {g}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-gray-300 text-center">No goals set yet.</p>
+        )}
+      </div>
+
+      {/* Affirmations - Smaller below */}
+      <div className="bg-black/60 p-4 rounded-2xl shadow-lg w-full max-w-md mb-6">
+        <h2 className="text-xl font-bold mb-3 text-center">Affirmations</h2>
+        {affirmations.length > 0 ? (
+          <ul className="space-y-2 text-sm">
+            {affirmations.map((a, i) => (
+              <li
+                key={i}
+                className="bg-white/10 p-2 rounded-lg text-center"
+              >
+                {a}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-gray-300 text-center">No affirmations yet.</p>
+        )}
+      </div>
+
+      {/* Manage Buttons */}
+      <div className="flex gap-4 mt-4">
+        <button
+          onClick={() => setShowAffirmations(true)}
+          className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg"
+        >
+          Manage Affirmations
+        </button>
+        <button
+          onClick={() => setShowBackgrounds(true)}
+          className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg"
+        >
+          Manage Backgrounds
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ===========================
    Affirmations Modal
 =========================== */
 function AffirmationsModal({ show, onClose, affirmations, setAffirmations }) {
   const [input, setInput] = useState("");
   if (!show) return null;
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!input.trim()) return;
-    setAffirmations([...affirmations, input.trim()]);
+    const updated = [...affirmations, input.trim()];
+    setAffirmations(updated);
     setInput("");
-  };
-
-  const handleDelete = (index) => {
-    setAffirmations(affirmations.filter((_, i) => i !== index));
-  };
-
-  const handleEdit = (index) => {
-    const next = prompt("Edit affirmation", affirmations[index]);
-    if (next !== null) {
-      setAffirmations(affirmations.map((a, i) => (i === index ? next : a)));
-    }
+    await fetch("/api/data", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ affirmations: updated }),
+    });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-gray-900 text-white p-6 rounded-lg w-96 max-h-[80vh] overflow-y-auto">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
+      <div className="bg-gray-900 text-white p-6 rounded-lg w-96">
         <h2 className="text-xl font-bold mb-4">Manage Affirmations</h2>
-
         <ul className="space-y-2 mb-4">
           {affirmations.map((a, i) => (
-            <li key={i} className="flex justify-between items-center">
-              <span className="truncate">{a}</span>
-              <div className="flex gap-2">
-                <button
-                  className="text-blue-300 hover:underline text-sm"
-                  onClick={() => handleEdit(i)}
-                >
-                  Edit
-                </button>
-                <button
-                  className="text-red-400 hover:underline text-sm"
-                  onClick={() => handleDelete(i)}
-                >
-                  Delete
-                </button>
-              </div>
+            <li key={i} className="flex justify-between">
+              <span>{a}</span>
+              <button
+                className="text-red-400"
+                onClick={async () => {
+                  const updated = affirmations.filter((_, idx) => idx !== i);
+                  setAffirmations(updated);
+                  await fetch("/api/data", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ affirmations: updated }),
+                  });
+                }}
+              >
+                Delete
+              </button>
             </li>
           ))}
         </ul>
-
-        <div className="flex gap-2">
-          <input
-            type="text"
-            className="flex-1 p-1 rounded text-black"
-            placeholder="New affirmation"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-          />
-          <button
-            className="bg-green-500 px-3 py-1 rounded hover:bg-green-600"
-            onClick={handleAdd}
-          >
-            Add
-          </button>
-        </div>
-
+        <input
+          className="w-full p-2 mb-2 text-black rounded"
+          placeholder="New affirmation"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
         <button
-          className="mt-4 bg-gray-700 px-4 py-1 rounded hover:bg-gray-600"
+          onClick={handleAdd}
+          className="bg-green-500 px-3 py-1 rounded w-full"
+        >
+          Add
+        </button>
+        <button
+          className="mt-4 bg-gray-700 px-4 py-1 rounded w-full"
           onClick={onClose}
         >
           Close
@@ -89,7 +167,6 @@ function AffirmationsModal({ show, onClose, affirmations, setAffirmations }) {
 =========================== */
 function BackgroundsModal({ show, onClose, backgrounds, setBackgrounds }) {
   const [newImage, setNewImage] = useState(null);
-
   if (!show) return null;
 
   const handleAdd = async () => {
@@ -98,38 +175,25 @@ function BackgroundsModal({ show, onClose, backgrounds, setBackgrounds }) {
     formData.append("file", newImage);
     formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
 
-    try {
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
-        { method: "POST", body: formData }
-      );
-      const data = await res.json();
-      const updated = [...backgrounds, data.secure_url];
-      setBackgrounds(updated);
-
-      await fetch("/api/data", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ backgrounds: updated }),
-      });
-    } catch (err) {
-      console.error("Upload failed:", err);
-    }
-    setNewImage(null);
-  };
-
-  const handleDelete = async (index) => {
-    const updated = backgrounds.filter((_, i) => i !== index);
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: "POST", body: formData }
+    );
+    const data = await res.json();
+    const updated = [...backgrounds, data.secure_url];
     setBackgrounds(updated);
+
     await fetch("/api/data", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ backgrounds: updated }),
     });
+
+    setNewImage(null);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
       <div className="bg-gray-900 text-white p-6 rounded-lg w-96">
         <h2 className="text-xl font-bold mb-4">Manage Backgrounds</h2>
         <ul className="space-y-2 mb-4">
@@ -137,8 +201,16 @@ function BackgroundsModal({ show, onClose, backgrounds, setBackgrounds }) {
             <li key={i} className="flex justify-between">
               <span>Background {i + 1}</span>
               <button
-                className="text-red-400 hover:underline text-sm"
-                onClick={() => handleDelete(i)}
+                className="text-red-400"
+                onClick={async () => {
+                  const updated = backgrounds.filter((_, idx) => idx !== i);
+                  setBackgrounds(updated);
+                  await fetch("/api/data", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ backgrounds: updated }),
+                  });
+                }}
               >
                 Delete
               </button>
@@ -151,13 +223,13 @@ function BackgroundsModal({ show, onClose, backgrounds, setBackgrounds }) {
           onChange={(e) => setNewImage(e.target.files?.[0] || null)}
         />
         <button
-          className="bg-blue-400 px-4 py-1 rounded hover:bg-blue-500 mt-2"
           onClick={handleAdd}
+          className="bg-blue-500 px-3 py-1 rounded w-full mt-2"
         >
-          Add Background
+          Add
         </button>
         <button
-          className="mt-4 bg-gray-700 px-4 py-1 rounded hover:bg-gray-600"
+          className="mt-4 bg-gray-700 px-4 py-1 rounded w-full"
           onClick={onClose}
         >
           Close
@@ -168,38 +240,15 @@ function BackgroundsModal({ show, onClose, backgrounds, setBackgrounds }) {
 }
 
 /* ===========================
-   Command Centre Dashboard
-=========================== */
-function CommandCentre({ setShowAffirmations, setShowBackgrounds }) {
-  return (
-    <div className="p-6 text-white">
-      <h1 className="text-3xl font-bold mb-6">Discipline Command Centre</h1>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Link to="/journal" className="p-4 bg-gray-700 rounded">Journal</Link>
-        <Link to="/goals" className="p-4 bg-gray-700 rounded">Goals</Link>
-        <Link to="/stats" className="p-4 bg-gray-700 rounded">Stats</Link>
-        <Link to="/calendar" className="p-4 bg-gray-700 rounded">Calendar</Link>
-        <Link to="/progress-pics" className="p-4 bg-gray-700 rounded">Progress Pics</Link>
-        <button onClick={() => setShowAffirmations(true)} className="p-4 bg-gray-700 rounded">
-          Affirmations
-        </button>
-        <button onClick={() => setShowBackgrounds(true)} className="p-4 bg-gray-700 rounded">
-          Backgrounds
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ===========================
-   App Root
+   App Root with Background Slideshow
 =========================== */
 function App() {
   const [showAffirmations, setShowAffirmations] = useState(false);
   const [showBackgrounds, setShowBackgrounds] = useState(false);
   const [affirmations, setAffirmations] = useState([]);
   const [backgrounds, setBackgrounds] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [bgIndex, setBgIndex] = useState(0);
 
   // Load data on mount
   useEffect(() => {
@@ -208,41 +257,67 @@ function App() {
       const data = await res.json();
       setAffirmations(data.affirmations || []);
       setBackgrounds(data.backgrounds || []);
+      setGoals(data.goals || []);
     })();
   }, []);
 
+  // Cycle background
+  useEffect(() => {
+    if (backgrounds.length === 0) return;
+    const interval = setInterval(() => {
+      setBgIndex((i) => (i + 1) % backgrounds.length);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [backgrounds]);
+
   return (
     <Router>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <CommandCentre
-              setShowAffirmations={setShowAffirmations}
-              setShowBackgrounds={setShowBackgrounds}
-            />
-          }
-        />
-        <Route path="/journal" element={<Journal />} />
-        <Route path="/goals" element={<Goals />} />
-        <Route path="/stats" element={<Stats />} />
-        <Route path="/calendar" element={<Calendar />} />
-        <Route path="/progress-pics" element={<ProgressPics />} />
-      </Routes>
+      {/* Background slideshow */}
+      {backgrounds.length > 0 ? (
+        <div
+          className="fixed inset-0 bg-cover bg-center transition-all duration-1000"
+          style={{ backgroundImage: `url(${backgrounds[bgIndex]})` }}
+        ></div>
+      ) : (
+        <div className="fixed inset-0 bg-gradient-to-r from-gray-800 to-black"></div>
+      )}
 
-      {/* Modals */}
-      <AffirmationsModal
-        show={showAffirmations}
-        onClose={() => setShowAffirmations(false)}
-        affirmations={affirmations}
-        setAffirmations={setAffirmations}
-      />
-      <BackgroundsModal
-        show={showBackgrounds}
-        onClose={() => setShowBackgrounds(false)}
-        backgrounds={backgrounds}
-        setBackgrounds={setBackgrounds}
-      />
+      {/* Overlay */}
+      <div className="relative z-10 min-h-screen bg-black/60">
+        <Navbar />
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <CommandCentre
+                affirmations={affirmations}
+                goals={goals}
+                setShowAffirmations={setShowAffirmations}
+                setShowBackgrounds={setShowBackgrounds}
+              />
+            }
+          />
+          <Route path="/journal" element={<Journal />} />
+          <Route path="/goals" element={<Goals />} />
+          <Route path="/stats" element={<Stats />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/progress-pics" element={<ProgressPics />} />
+        </Routes>
+
+        {/* Modals */}
+        <AffirmationsModal
+          show={showAffirmations}
+          onClose={() => setShowAffirmations(false)}
+          affirmations={affirmations}
+          setAffirmations={setAffirmations}
+        />
+        <BackgroundsModal
+          show={showBackgrounds}
+          onClose={() => setShowBackgrounds(false)}
+          backgrounds={backgrounds}
+          setBackgrounds={setBackgrounds}
+        />
+      </div>
     </Router>
   );
 }
