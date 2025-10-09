@@ -24,13 +24,32 @@ function Navbar() {
 
 /* ===========================
    Command Centre Home
+   (Daily goals left, longer term goals right, checkboxes)
 =========================== */
 function CommandCentre({
   affirmations,
   goals,
   setShowAffirmations,
   setShowBackgrounds,
+  setGoals,
 }) {
+  // Handler for checking/unchecking a goal
+  const handleCheck = (type, idx) => {
+    const updatedGoals = {
+      ...goals,
+      [type]: goals[type].map((g, i) =>
+        i === idx ? { ...g, done: !g.done } : g
+      ),
+    };
+    setGoals(updatedGoals);
+    // Optionally persist to backend:
+    fetch("/api/data", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goals: updatedGoals }),
+    });
+  };
+
   return (
     <div className="pt-24 px-6 text-white relative z-10 flex flex-col items-center min-h-screen">
       {/* Big Title */}
@@ -38,30 +57,88 @@ function CommandCentre({
         Discipline Command Centre
       </h1>
 
-      {/* Goals - Big in Centre */}
-      <div className="bg-black/70 p-8 rounded-2xl shadow-xl w-full max-w-3xl mb-10">
-        <h2 className="text-3xl font-bold mb-4 text-center">Goals</h2>
-        {goals.daily?.length > 0 || goals.short?.length > 0 || goals.long?.length > 0 ? (
-          <ul className="space-y-3">
-            {goals.daily?.map((g, i) => (
-              <li key={`daily-${i}`} className="bg-white/10 p-4 rounded-lg text-lg text-center">
-                {g.text}
-              </li>
-            ))}
-            {goals.short?.map((g, i) => (
-              <li key={`short-${i}`} className="bg-white/10 p-4 rounded-lg text-lg text-center">
-                {g.text} {g.due && <span className="text-xs text-gray-400">(due {g.due})</span>}
-              </li>
-            ))}
-            {goals.long?.map((g, i) => (
-              <li key={`long-${i}`} className="bg-white/10 p-4 rounded-lg text-lg text-center">
-                {g.text} {g.due && <span className="text-xs text-gray-400">(due {g.due})</span>}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-gray-300 text-center">No goals set yet.</p>
-        )}
+      {/* Goals Section: Daily (Left), Short/Long (Right) */}
+      <div className="flex w-full max-w-4xl gap-10 mb-10">
+        {/* Daily Goals - Left */}
+        <div className="flex-1 bg-black/70 p-6 rounded-2xl shadow-xl">
+          <h2 className="text-2xl font-bold mb-4 text-left">Daily Goals</h2>
+          {goals.daily?.length > 0 ? (
+            <ul className="space-y-3">
+              {goals.daily.map((g, i) => (
+                <li
+                  key={`daily-${i}`}
+                  className="bg-white/10 p-3 rounded-lg flex items-center gap-3"
+                >
+                  <input
+                    type="checkbox"
+                    checked={g.done || false}
+                    onChange={() => handleCheck("daily", i)}
+                    className="accent-green-500 w-5 h-5"
+                  />
+                  <span className={g.done ? "line-through text-gray-400" : ""}>{g.text}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-300">No daily goals set yet.</p>
+          )}
+        </div>
+
+        {/* Short & Long Goals - Right */}
+        <div className="flex-1 bg-black/70 p-6 rounded-2xl shadow-xl">
+          <h2 className="text-2xl font-bold mb-4 text-left">Longer Term Goals</h2>
+          {goals.short?.length > 0 && (
+            <>
+              <h3 className="font-semibold text-lg mb-2">Short Term</h3>
+              <ul className="space-y-3 mb-4">
+                {goals.short.map((g, i) => (
+                  <li
+                    key={`short-${i}`}
+                    className="bg-white/10 p-3 rounded-lg flex items-center gap-3"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={g.done || false}
+                      onChange={() => handleCheck("short", i)}
+                      className="accent-blue-500 w-5 h-5"
+                    />
+                    <span className={g.done ? "line-through text-gray-400" : ""}>{g.text}</span>
+                    {g.due && (
+                      <span className="text-xs text-gray-400 ml-2">(due {g.due})</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {goals.long?.length > 0 && (
+            <>
+              <h3 className="font-semibold text-lg mb-2">Long Term</h3>
+              <ul className="space-y-3">
+                {goals.long.map((g, i) => (
+                  <li
+                    key={`long-${i}`}
+                    className="bg-white/10 p-3 rounded-lg flex items-center gap-3"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={g.done || false}
+                      onChange={() => handleCheck("long", i)}
+                      className="accent-purple-500 w-5 h-5"
+                    />
+                    <span className={g.done ? "line-through text-gray-400" : ""}>{g.text}</span>
+                    {g.due && (
+                      <span className="text-xs text-gray-400 ml-2">(due {g.due})</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {!goals.short?.length && !goals.long?.length && (
+            <p className="text-gray-300">No longer term goals set yet.</p>
+          )}
+        </div>
       </div>
 
       {/* Affirmations - Smaller below */}
@@ -70,7 +147,10 @@ function CommandCentre({
         {affirmations.length > 0 ? (
           <ul className="space-y-2 text-sm">
             {affirmations.map((a, i) => (
-              <li key={i} className="bg-white/10 p-2 rounded-lg text-center">
+              <li
+                key={i}
+                className="bg-white/10 p-2 rounded-lg text-center"
+              >
                 {a}
               </li>
             ))}
@@ -314,6 +394,7 @@ function App() {
                 goals={goals}
                 setShowAffirmations={setShowAffirmations}
                 setShowBackgrounds={setShowBackgrounds}
+                setGoals={setGoals}
               />
             }
           />
