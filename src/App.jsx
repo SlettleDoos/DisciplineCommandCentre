@@ -155,7 +155,7 @@ function AffirmationsModal({ show, onClose, affirmations, setAffirmations }) {
           className="mt-4 bg-gray-700 px-4 py-1 rounded w-full"
           onClick={onClose}
         >
-          Close
+          Closes Boobies
         </button>
       </div>
     </div>
@@ -169,28 +169,42 @@ function BackgroundsModal({ show, onClose, backgrounds, setBackgrounds }) {
   const [newImage, setNewImage] = useState(null);
   if (!show) return null;
 
-  const handleAdd = async () => {
-    if (!newImage) return;
-    const formData = new FormData();
-    formData.append("file", newImage);
-    formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+ const handleAdd = async () => {
+  if (!newImage) return;
+  const formData = new FormData();
+  formData.append("file", newImage);
+  formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
 
+  try {
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
       { method: "POST", body: formData }
     );
     const data = await res.json();
+
+    if (!res.ok || !data.secure_url) {
+      alert("Upload failed: " + (data.error?.message || "Unknown error"));
+      return;
+    }
+
     const updated = [...backgrounds, data.secure_url];
     setBackgrounds(updated);
 
-    await fetch("/api/data", {
+    const saveRes = await fetch("/api/data", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ backgrounds: updated }),
     });
 
+    if (!saveRes.ok) {
+      alert("Failed to save backgrounds to server");
+    }
+
     setNewImage(null);
-  };
+  } catch (err) {
+    alert("Something went wrong: " + err.message);
+  }
+};
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
