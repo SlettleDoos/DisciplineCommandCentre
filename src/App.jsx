@@ -41,14 +41,21 @@ function CommandCentre({
       {/* Goals - Big in Centre */}
       <div className="bg-black/70 p-8 rounded-2xl shadow-xl w-full max-w-3xl mb-10">
         <h2 className="text-3xl font-bold mb-4 text-center">Goals</h2>
-        {goals.length > 0 ? (
+        {goals.daily?.length > 0 || goals.short?.length > 0 || goals.long?.length > 0 ? (
           <ul className="space-y-3">
-            {goals.map((g, i) => (
-              <li
-                key={i}
-                className="bg-white/10 p-4 rounded-lg text-lg text-center"
-              >
-                {g}
+            {goals.daily?.map((g, i) => (
+              <li key={`daily-${i}`} className="bg-white/10 p-4 rounded-lg text-lg text-center">
+                {g.text}
+              </li>
+            ))}
+            {goals.short?.map((g, i) => (
+              <li key={`short-${i}`} className="bg-white/10 p-4 rounded-lg text-lg text-center">
+                {g.text} {g.due && <span className="text-xs text-gray-400">(due {g.due})</span>}
+              </li>
+            ))}
+            {goals.long?.map((g, i) => (
+              <li key={`long-${i}`} className="bg-white/10 p-4 rounded-lg text-lg text-center">
+                {g.text} {g.due && <span className="text-xs text-gray-400">(due {g.due})</span>}
               </li>
             ))}
           </ul>
@@ -63,10 +70,7 @@ function CommandCentre({
         {affirmations.length > 0 ? (
           <ul className="space-y-2 text-sm">
             {affirmations.map((a, i) => (
-              <li
-                key={i}
-                className="bg-white/10 p-2 rounded-lg text-center"
-              >
+              <li key={i} className="bg-white/10 p-2 rounded-lg text-center">
                 {a}
               </li>
             ))}
@@ -155,7 +159,7 @@ function AffirmationsModal({ show, onClose, affirmations, setAffirmations }) {
           className="mt-4 bg-gray-700 px-4 py-1 rounded w-full"
           onClick={onClose}
         >
-          Closes Boobies
+          Close
         </button>
       </div>
     </div>
@@ -169,42 +173,42 @@ function BackgroundsModal({ show, onClose, backgrounds, setBackgrounds }) {
   const [newImage, setNewImage] = useState(null);
   if (!show) return null;
 
- const handleAdd = async () => {
-  if (!newImage) return;
-  const formData = new FormData();
-  formData.append("file", newImage);
-  formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+  const handleAdd = async () => {
+    if (!newImage) return;
+    const formData = new FormData();
+    formData.append("file", newImage);
+    formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
 
-  try {
-    const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
-      { method: "POST", body: formData }
-    );
-    const data = await res.json();
+    try {
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: "POST", body: formData }
+      );
+      const data = await res.json();
 
-    if (!res.ok || !data.secure_url) {
-      alert("Upload failed: " + (data.error?.message || "Unknown error"));
-      return;
+      if (!res.ok || !data.secure_url) {
+        alert("Upload failed: " + (data.error?.message || "Unknown error"));
+        return;
+      }
+
+      const updated = [...backgrounds, data.secure_url];
+      setBackgrounds(updated);
+
+      const saveRes = await fetch("/api/data", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backgrounds: updated }),
+      });
+
+      if (!saveRes.ok) {
+        alert("Failed to save backgrounds to server");
+      }
+
+      setNewImage(null);
+    } catch (err) {
+      alert("Something went wrong: " + err.message);
     }
-
-    const updated = [...backgrounds, data.secure_url];
-    setBackgrounds(updated);
-
-    const saveRes = await fetch("/api/data", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ backgrounds: updated }),
-    });
-
-    if (!saveRes.ok) {
-      alert("Failed to save backgrounds to server");
-    }
-
-    setNewImage(null);
-  } catch (err) {
-    alert("Something went wrong: " + err.message);
-  }
-};
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
@@ -261,7 +265,8 @@ function App() {
   const [showBackgrounds, setShowBackgrounds] = useState(false);
   const [affirmations, setAffirmations] = useState([]);
   const [backgrounds, setBackgrounds] = useState([]);
-  const [goals, setGoals] = useState([]);
+  const [goals, setGoals] = useState({ daily: [], short: [], long: [] });
+  const [user, setUser] = useState({});
   const [bgIndex, setBgIndex] = useState(0);
 
   // Load data on mount
@@ -271,7 +276,8 @@ function App() {
       const data = await res.json();
       setAffirmations(data.affirmations || []);
       setBackgrounds(data.backgrounds || []);
-      setGoals(data.goals || []);
+      setGoals(data.goals || { daily: [], short: [], long: [] });
+      setUser(data.user || {});
     })();
   }, []);
 
@@ -312,9 +318,16 @@ function App() {
             }
           />
           <Route path="/journal" element={<Journal />} />
-          <Route path="/goals" element={<Goals />} />
+          <Route path="/goals" element={
+            <Goals
+              goals={goals}
+              setGoals={setGoals}
+              user={user}
+              setUser={setUser}
+            />
+          } />
           <Route path="/stats" element={<Stats />} />
-          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/calendar" element={<Calendar goals={goals} />} />
           <Route path="/progress-pics" element={<ProgressPics />} />
         </Routes>
 
